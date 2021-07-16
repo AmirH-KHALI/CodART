@@ -31,6 +31,8 @@ class CodeAnalyzerListener(JavaParserLabeledListener):
         self.method_nums = dict()
         self.public_attr_nums = dict()
         self.private_attr_nums = dict()
+        self.fanin = dict()
+        self.fanout = 0
 
         self.TAB = "\t"
         self.NEW_LINE = "\n"
@@ -61,6 +63,20 @@ class CodeAnalyzerListener(JavaParserLabeledListener):
             else:
                 self.public_attr_nums[self.current_class_name] += 1
 
+    def enterExpression4(self, ctx: JavaParserLabeled.Expression4Context):
+        try:
+            idt = ctx.creator().createdName().IDENTIFIER()[0].getText()
+
+            if idt != self.current_class_name:
+                if idt in self.fanin:
+                    self.fanin[idt] += 1
+                else:
+                    self.fanin[idt] = 1
+        except:
+            pass
+
+        self.fanout += 1
+
 
 class CodeAnalyzerAPI:
 
@@ -87,23 +103,39 @@ class CodeAnalyzerAPI:
 
 if __name__ == '__main__':
     total_class_num = 0
-    output = ''
+    output_dict = dict()
+    fanin = dict()
     for f in get_java_files(
             "E:\\desk\\University\\99002-CD (compiler)\\Project\\CodART\\benchmark_projects\\JSON"
     ):
         listener = CodeAnalyzerAPI(f[0]).do_analyse()
 
+        for k in listener.fanin.keys():
+            if k in fanin:
+                fanin[k] += 1
+            else:
+                fanin[k] = 1
+
         classes = list(listener.method_nums.keys())
         for i in range(len(classes)):
             class_name = classes[i]
+            output = ''
             output += str(total_class_num + 1) + '.' + class_name + ':\n'
             output += listener.TAB + 'no.attrs: ' \
                       + str(listener.private_attr_nums[class_name] + listener.public_attr_nums[class_name]) + '\n'
             output += listener.TAB + listener.TAB + 'public: ' + str(listener.public_attr_nums[class_name]) + '\n'
             output += listener.TAB + listener.TAB + 'private: ' + str(listener.private_attr_nums[class_name]) + '\n'
             output += listener.TAB + 'no.methods: ' + str(listener.method_nums[class_name]) + '\n'
+            output += listener.TAB + 'fanout: ' + str(listener.fanout) + '\n'
+            output_dict[class_name] = output
             total_class_num += 1
 
     print('no.classes:', str(total_class_num))
-    print(output)
+    for k in output_dict.keys():
+        if k in fanin:
+            output_dict[k] += '\tfanin: ' + str(fanin[k]) + '\n'
+        else:
+            output_dict[k] += '\tfanin: 0\n'
+
+        print(output_dict[k])
 
